@@ -1,0 +1,45 @@
+# Training configuration
+gpu: 0
+seed: 42
+
+# Data configurations
+dataset_path: 'dataset/AAPM/processed'
+dataset_name: 'aapm_all_npy_3mm'
+patch_size:   # 64
+patch_n:      # 10
+
+# Train configurations
+output_path: 'output'
+log_path: 'log'
+checkpoint_path: 'ckpt'
+checkpoint_file: ''     
+config_path: 'config'
+config_file: ''
+
+
+num_workers: 16
+optim: 'Adam'         # ['SGD', 'Adam', 'AdamW']
+scheduler: 'StepLR'   # ['StepLR', 'Cosine']
+loss: 'MSE'           # ['MSE', 'L1', 'Huber'] 0.9MSE+0.1L1
+lr: 0.001             # 0.00001 
+weight_decay: 0      # 0.0001 / 0.01
+step_size: 100     # every step_size epochs 10 / 3000 / 30
+print_freq: 100
+save_freq: 1
+num_epochs: 200
+batch_size: 16
+
+# Metrics configurations
+norm_range_min: -1024.0
+norm_range_max: 3072.0
+trunc_min: -160.0   # 区间
+trunc_max: 240.0
+
+
+# model configurations
+model: 'CTformer'
+resize: True
+MODEL:
+  IMG_SIZE: 256     # 512 if reize=False
+  NUM_HEADS: 8
+
