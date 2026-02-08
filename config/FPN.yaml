@@ -3,32 +3,33 @@ gpu: 0
 seed: 42
 
 
-# Data configurations
-dataset_path: 'dataset/AAPM/processed'
+# Data configurations -> redirected to annotation file
+dataset_path: 'data'
 dataset_name: 'aapm_all_npy_3mm'
 patch_size:   # 64
 patch_n:      # 10
 
 # Train configurations
 output_path: 'output'
-log_path: 'log'
+# log_path: 'log'
 config_path: 'config'
 config_file: ''
-checkpoint_path: 'ckpt'
-checkpoint_file: ''     
+# checkpoint_path: 'ckpt'
+# checkpoint_file: 
+
 
 
 num_workers: 16
-optim: 'Adam'         # ['SGD', 'Adam', 'AdamW']
+optim: 'SGD'        # ['SGD', 'Adam', 'AdamW']
 scheduler: 'StepLR'   # ['StepLR', 'Cosine']
-loss: 'MSE'           # ['MSE', 'L1', 'Huber'] 0.9MSE+0.1L1
-lr: 0.001             # 0.00001 
-weight_decay: 0.0001      # 0.0001 / 0.01
-step_size: 3000     # every step_size epochs 10 / 3000 / 30
-print_freq: 100
-save_freq: 1
-num_epochs: 300
-batch_size: 16
+loss: 'FF'            # ['MSE', 'L1', 'Huber', 'FF'] 0.9MSE+0.1L1
+lr: 0.001             # 0.00/ 1e-4 / redcnn 1e-5           
+weight_decay: 0       # 0.0001 
+step_size: 30     # every step_size epochs 100 
+print_freq: 200        # steps
+# save_freq: 1
+num_epochs: 200         # 300
+batch_size: 8
 
 
 # Metrics configurations
@@ -40,12 +41,13 @@ trunc_max: 240.0
 
 # Model configurations
 model: 'FPN'
-resize: True
-FPN:
+resize: True      # False       
+MODEL:
   C: 1
-  H: 256   # 512
-  W: 256   # 512
-  num_down_blocks: [2,2,2,2]
+  H: 256    # 512
+  W: 256  # 512
+  # num_down_blocks: [2,2,2,2]
+  num_down_blocks: [1,1,1,1]
   num_up_blocks: [1,1,1,1]
   fu_mode: 'retention'    # ['attention', 'retention']
   upsample_mode: 'conv'   # ['bilinear', 'conv']

@@ -33,19 +33,24 @@ def random_split(arr, split_ratio=0.8, random_seed=43):
     return train_arr, test_arr
 
 
-def denormalize(image, norm_range_max, norm_range_min):
-    image = image * (norm_range_max - norm_range_min) + norm_range_min
+def normalize(image, norm_min=-1024.0, norm_max=3072.0):
+   image = (image - norm_min) / (norm_max - norm_min)
+   return image
+
+
+def denormalize(image, norm_min, norm_max):
+    image = image * (norm_max - norm_min) + norm_min
     return image
 
 
-def trunc(mat, trunc_max, trunc_min):
+def trunc(mat, trunc_min, trunc_max):
     mat[mat <= trunc_min] = trunc_min
     mat[mat >= trunc_max] = trunc_max
     return mat
 
 
 def save_fig(x, y, pred, path, original_result, pred_result, trunc_max, trunc_min):
-    x, y, pred = x.numpy(), y.numpy(), pred.numpy()
+    # x, y, pred = x.numpy(), y.numpy(), pred.numpy()
     f, ax = plt.subplots(1, 3, figsize=(30, 10))
     ax[0].imshow(x, cmap=plt.cm.gray, vmin=trunc_min, vmax=trunc_max)
     ax[0].set_title('Quarter-dose', fontsize=30)

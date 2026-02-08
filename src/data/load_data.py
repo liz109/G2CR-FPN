@@ -3,12 +3,29 @@ import pandas as pd
 import torch.utils.data as Data
 from torchvision import transforms
 import cv2
+from src.data import data_utils
+
+
+# Define normalization/truncation bounds
+NORM_MIN = -1024.0
+NORM_MAX = 3072.0
+TRUNC_MIN = -160.0
+TRUNC_MAX = 240.0
+
 
 # for Grayscale
 transform = transforms.Compose([
-    transforms.ToTensor()
-    # transforms.Normalize(mean=[0.5], std=[0.5]) 
-])  
+    transforms.Lambda(lambda x: data_utils.denormalize(x, NORM_MIN, NORM_MAX)),              # [0, 1] → full HU range
+    transforms.Lambda(lambda x: data_utils.trunc(x, TRUNC_MIN, TRUNC_MAX)),            # truncate to [trunc_min, trunc_max]
+    transforms.Lambda(lambda x: data_utils.normalize(x, TRUNC_MIN, TRUNC_MAX)),    # [trunc_min, trunc_max] → [0, 1]
+    transforms.ToTensor(),                               # (H, W) → (1, H, W), float32
+])
+
+# transform = transforms.Compose([
+#     transforms.ToTensor()
+#     # transforms.Normalize(mean=[0.5], std=[0.5]) 
+# ])  
+
 
 class AAPMDataset(Data.Dataset):
     def __init__(self, annotation, resize=False, transform=transform, patch_n=None, patch_size=None) -> None:

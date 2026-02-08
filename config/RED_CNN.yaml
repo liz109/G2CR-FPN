@@ -3,12 +3,12 @@ gpu: 0
 seed: 42
 
 # Path configurations
-dataset_path: 'dataset/AAPM/processed'
+dataset_path: 'data'
 dataset_name: 'aapm_all_npy_3mm'
 output_path: 'output'
 log_path: 'log'
-checkpoint_path: 'ckpt'
-checkpoint_file: 'RED_CNN_100_1706748614.pt'     
+# checkpoint_path: 'ckpt'
+# checkpoint_file: 'RED_CNN_100_1706748614.pt'     
 config_path: 'config'
 config_file: ''
 model: 'RED_CNN'
@@ -22,14 +22,14 @@ patch_n:      # 10
 num_workers: 4
 optim: 'Adam'         # ['SGD', 'Adam', 'AdamW']
 scheduler: 'StepLR'   # ['StepLR', 'Cosine']
-loss: 'MSE'           # ['MSE']
+loss: 'FF'           # ['MSE'] # lambda1 = 0 (FF not used!)
 lr: 0.00001
 weight_decay: 0.0001
 num_epochs: 100
 step_size: 1000
-batch_size: 16
-print_freq: 50
-save_freq: 1
+batch_size: 8
+print_freq: 200
+# save_freq: 1
 
 # Metrics configurations
 norm_range_min: -1024.0

@@ -1,0 +1,53 @@
+# General configurations
+gpu: 0
+seed: 42
+
+# Data configurations
+dataset_path: 'dataset/GE'
+dataset_name: 'img_sparse100' # 'img_limit120' 
+patch_size:   # 64
+patch_n:      # 10
+
+# Train configurations
+output_path: 'output'
+log_path: 'log'
+config_path: 'config'
+config_file: ''
+checkpoint_path: 'ckpt'
+checkpoint_file: 'FPN_479_1745251507.pt'
+
+
+num_workers: 16
+optim: 'Adam'         # ['SGD', 'Adam', 'AdamW']
+scheduler: 'StepLR'   # ['StepLR', 'Cosine']
+loss: 'MSE'           # ['MSE', 'L1', 'Huber'] 0.9MSE+0.1L1
+lr: 0.001             # 0.00001 
+weight_decay: 0      # 0.0001 / 0.01
+step_size: 3000     # every step_size epochs 10 / 3000 / 30
+print_freq: 100
+save_freq: 1
+num_epochs: 500
+batch_size: 16 #8
+
+
+# Metrics configurations
+norm_range_min: 0.0
+norm_range_max: 1024.0
+trunc_min: 0.0   # 区间
+trunc_max: 1024.0
+
+
+# Model configurations
+model: 'FPN'
+resize: True     # True: x//2
+MODEL:
+  C: 1
+  H: 256 # 256 for resize; 512 for normal
+  W: 256 
+  num_down_blocks: [2,2,2,2]
+  num_up_blocks: [1,1,1,1]
+  fu_mode: 'retention'    # ['attention', 'retention']
+  upsample_mode: 'conv'   # ['bilinear', 'conv']
+  scale: 2
+  planes: 64
+  detector: 'sobel'       # ['', 'sobel']
