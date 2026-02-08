@@ -6,7 +6,7 @@ https://jonathan-hui.medium.com/understanding-feature-pyramid-networks-for-objec
 src: https://github.com/kuangliu/pytorch-fpn/blob/master/fpn.py
 '''
 import sys
-ROOT = '/home/lzhou/medical_img'
+ROOT = '/mnt/new_ssd/lzhou/FPN_denoise_new'
 sys.path.append(ROOT)
 
 import torch
@@ -16,10 +16,8 @@ from torch.autograd import Variable
 
 from src.model.elements import DoubleConv, OutConv, PatchEmbeddings, Embeddings 
 from src.model.elements import ResNet, FusionBlocks
-from src.model.sobel import SobelFilter
-from src.model.sobel_new import SobelConv2d
+from model.sobel import SobelConv2d
 
-from src.model import model_utils 
 
     
 class FPN(nn.Module):
@@ -65,10 +63,14 @@ class FPN(nn.Module):
         self.debed_layers = nn.ModuleList([])
 
         for i in range(len(num_up_blocks)):
-            if fu_mode == 'retention':
-                embed_v_layer = PatchEmbeddings(image_size=h, num_channels=c, patch_size=p, embed_size=c)
-                embed_q_layer = PatchEmbeddings(image_size=h, num_channels=c, patch_size=p, embed_size=c)
-                embed_k_layer = PatchEmbeddings(image_size=h, num_channels=c, patch_size=p, embed_size=c)
+            # if fu_mode == 'retention':  # PatchEmbeddings (no positional)
+            #     embed_v_layer = PatchEmbeddings(image_size=h, num_channels=c, patch_size=p, embed_size=c)
+            #     embed_q_layer = PatchEmbeddings(image_size=h, num_channels=c, patch_size=p, embed_size=c)
+            #     embed_k_layer = PatchEmbeddings(image_size=h, num_channels=c, patch_size=p, embed_size=c)
+            if fu_mode == 'retention':  # Embeddings (patch + positional)
+                embed_v_layer = Embeddings(image_size=h, num_channels=c, patch_size=p, embed_size=c, emb_dropout=0.)
+                embed_q_layer = Embeddings(image_size=h, num_channels=c, patch_size=p, embed_size=c, emb_dropout=0.)
+                embed_k_layer = Embeddings(image_size=h, num_channels=c, patch_size=p, embed_size=c, emb_dropout=0.)
             else:
                 embed_v_layer = Embeddings(image_size=h, num_channels=c, patch_size=p, embed_size=c, emb_dropout=0.)
                 embed_q_layer = Embeddings(image_size=h, num_channels=c, patch_size=p, embed_size=c, emb_dropout=0.)
@@ -95,7 +97,6 @@ class FPN(nn.Module):
         self.detector_y_layers = nn.ModuleList([])
         for i in range(len(num_up_blocks)):
             if detector == 'sobel':
-                # layer = SobelFilter()
                 layer_x = SobelConv2d(direction='x', in_channels=c, out_channels=c, kernel_size=3, stride=1, padding=1, bias=True)
                 layer_y = SobelConv2d(direction='y', in_channels=c, out_channels=c, kernel_size=3, stride=1, padding=1, bias=True)
                 self.detector_x_layers.append(layer_x)
@@ -162,7 +163,7 @@ class FPN(nn.Module):
             v = self.embed_v_layers[i](prev_sample)
             q = self.embed_q_layers[i](cur_sample_x)
             k = self.embed_k_layers[i](cur_sample_y)
-            fused_sample = self.fusion_layers[i](q, k, v)
+            fused_sample = self.fusion_layers[i](q, k, v)       # !!!!
 
             c, l, d = fused_sample.size()
             fused_sample = fused_sample.reshape(c, d, int(l**(1/2)), int(l**(1/2)))  
@@ -178,21 +179,24 @@ class FPN(nn.Module):
     
 # def FPN101():
 #     # return FPN(Bottleneck, [3,4,23,3])
-#     return FPN(1, 512, 512, \
-#         num_down_blocks=[2,2,2,2], num_up_blocks=[2,2,2,2], \
-#         fu_mode='retention', detector='sobel'
+#     return FPN(1, 256, 256, \
+#         num_down_blocks=[1,1,1,1], num_up_blocks=[1,1,1,1], \
 #     )
 
 
 # def test():
 #     net = FPN101()
 #     total_params = sum(p.numel() for p in net.parameters() if p.requires_grad)   
-#     print('model size (grad): {:.3f}MB'.format(total_params / 1024**2))
-#     model_utils.model_size(net)     # 1322.043MB 
+#     print('model size (grad): {:.3f} M'.format(total_params / 1e6))
+#     model_utils.model_size(net)     # 1322.043M
 
-#     fms = net(Variable(torch.randn(16, 1, 512, 512)))      # [N, C, H, W]
-#     print("Output", fms.shape)
+#     # fms = net(Variable(torch.randn(16, 1, 512, 512)))      # [N, C, H, W]
+#     # print("Output", fms.shape)
 
 
 # if __name__ == '__main__':
 #     test()
+
+
+
+

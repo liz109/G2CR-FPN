@@ -4,25 +4,26 @@ from src.model.red_cnn import RED_CNN
 from src.model.sunet.sunet import SUNet_model
 from src.model.ctformer.ctformer import CTformer_model
 from src.model.swinir.swinir import SwinIR_model
+from src.model.loss import FocalFrequencyLoss_2D_pooling
 
 def build_model(cfg):
     if cfg.model == 'RED_CNN':
         model = RED_CNN()
     elif cfg.model == 'FPN':
         model = FPN(
-            C=cfg.FPN.C,
-            H=cfg.FPN.H,
-            W=cfg.FPN.W,
+            C=cfg.MODEL.C,
+            H=cfg.MODEL.H,
+            W=cfg.MODEL.W,
 
-            num_down_blocks=cfg.FPN.num_down_blocks,
-            num_up_blocks=cfg.FPN.num_up_blocks,
+            num_down_blocks=cfg.MODEL.num_down_blocks,
+            num_up_blocks=cfg.MODEL.num_up_blocks,
 
-            fu_mode=cfg.FPN.fu_mode,
-            upsample_mode=cfg.FPN.upsample_mode,
-            detector=cfg.FPN.detector,
+            fu_mode=cfg.MODEL.fu_mode,
+            upsample_mode=cfg.MODEL.upsample_mode,
+            detector=cfg.MODEL.detector,
 
-            scale=cfg.FPN.scale,
-            planes=cfg.FPN.planes
+            scale=cfg.MODEL.scale,
+            planes=cfg.MODEL.planes
         )
     elif cfg.model == 'SUNet':
         model = SUNet_model(cfg)
@@ -53,19 +54,22 @@ def build_scheduler(cfg, optimizer):
     if cfg.scheduler == 'StepLR':
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=cfg.step_size, gamma=0.5)      # gmma=0.5
     else:
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.num_epochs)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.num_epochs, eta_min=1e-7)
 
     return scheduler
 
 
 def build_loss(cfg):
-    assert cfg.loss in ['MSE', 'L1', 'Huber'], 'Unrecognized loss name'
+    assert cfg.loss in ['MSE', 'L1', 'Huber', 'FF'], 'Unrecognized loss name'
     if cfg.loss == 'MSE':
         loss_func = torch.nn.MSELoss()
     elif cfg.loss == 'L1':
         loss_func = torch.nn.L1Loss()
     elif cfg.loss == 'Huber':
         loss_func = torch.nn.HuberLoss()
+    elif cfg.loss == 'FF':
+        # focal frequency loss
+        loss_func = FocalFrequencyLoss_2D_pooling(log_matrix=True, pass_band=10)
     return loss_func
 
 

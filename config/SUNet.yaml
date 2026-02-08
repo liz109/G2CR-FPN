@@ -3,31 +3,32 @@ gpu: 0
 seed: 42
 
 # Data configurations
-dataset_path: 'dataset/AAPM/processed'
+dataset_path: 'data'
 dataset_name: 'aapm_all_npy_3mm'
 patch_size:   # 64
 patch_n:      # 10
 
 # Train configurations
 output_path: 'output'
-log_path: 'log'
-checkpoint_path: 'ckpt'
-checkpoint_file: ''     
+# log_path: 'log'
 config_path: 'config'
 config_file: ''
+# checkpoint_path: 'ckpt'
+# checkpoint_file: 'SUNet_175_1707168657.pt'     
+
 
 
 num_workers: 16
 optim: 'Adam'         # ['SGD', 'Adam', 'AdamW']
 scheduler: 'StepLR'   # ['StepLR', 'Cosine']
-loss: 'MSE'           # ['MSE', 'L1', 'Huber'] 0.9MSE+0.1L1
+loss: 'FF'           # ['MSE', 'L1', 'Huber'] 0.9MSE+0.1L1
 lr: 0.001             # 0.00001 
-weight_decay: 0.0001      # 0.0001 / 0.01
-step_size: 100     # every step_size epochs 10 / 3000 / 30
+weight_decay: 0      # 0.0001 / 0.01
+step_size: 50     # every step_size epochs 10 / 3000 / 30
 print_freq: 100
 save_freq: 1
 num_epochs: 200
-batch_size: 16
+batch_size: 8
 
 # Metrics configurations
 norm_range_min: -1024.0

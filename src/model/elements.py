@@ -151,59 +151,64 @@ class FusionBlock(nn.Module):
         self.layernorm3 = nn.LayerNorm(embed_size)
 
         self.mlp = MLP(embed_size, embed_size)
-
-    # def forward(self, q, k, v):
-    #     v = self.layernorm1(v)
-    #     fusion_output = self.fusion1(v,v,v)
-    #     v = v + fusion_output
-
-    #     v = self.layernorm_v(v)
-    #     q = self.layernorm_q(q)
-    #     k = self.layernorm_k(k)
-    #     fusion_output = self.fusion2(q, k, v)
-    #     v = v + fusion_output
-
-    #     mlp_output = self.mlp(self.layernorm3(v))
-    #     v = v + mlp_output
-    #     return v
+        
+        # add a gated residual
+        self.gate = nn.Sequential(nn.Linear(embed_size, embed_size), nn.Sigmoid())
     
     def forward(self, q, k, v):     # new connections in the paper
+        # 1) self fusion
         v_ = self.layernorm1(v)
         fusion_output = self.fusion1(v_,v_,v_)
         v = v + fusion_output
 
+        # 2) guided fusion 
         v_ = self.layernorm_v(v)
         q_ = self.layernorm_q(q)
         k_ = self.layernorm_k(k)
         fusion_output = self.fusion2(q_, k_, v_)
-        v = v + fusion_output
+        
+        if isinstance(self.fusion2, MultiScaleRetention):
+            # gate (token-wise, channel-wise)
+            g = self.gate(v_)       # shape [B, L, C], sigmoid in [0,1]
+            v = v + g * fusion_output
+        else:
+            v = v + fusion_output   # attention
+        # v = v + fusion_output
 
+        # 3) MLP
         v_ = self.layernorm3(v)
         mlp_output = self.mlp(v_)
         v = v + mlp_output
         return v
     
 
-    
-
-class FusionBlocks(nn.Module):
-    """
-    The attention / retention blocks module.
-    """
-
+class FusionBlocks(nn.Module):        # NEW VERSION
     def __init__(self, embed_size, fu_mode, num_blocks=1):
         super().__init__()
-        # Create a list of transformer blocks
-        self.blocks = nn.ModuleList([])
-        for _ in range(num_blocks):
-            block = FusionBlock(embed_size, fu_mode)
-            self.blocks.append(block)
+        self.blocks = nn.ModuleList([FusionBlock(embed_size, fu_mode) for _ in range(num_blocks)])
 
-    def forward(self, v, q, k):
-        # Calculate the transformer block's output for each block
+    def forward(self, q, k, v):
         for block in self.blocks:
-            v = block(v, q, k)
-        return v
+            v = block(q, k, v)
+        return v    
+
+# class FusionBlocks(nn.Module):
+#     """
+#     The attention / retention blocks module.
+#     """
+
+#     def __init__(self, embed_size, fu_mode, num_blocks=1):
+#         super().__init__()
+#         # Create a list of transformer blocks
+#         self.blocks = nn.ModuleList([])
+#         for _ in range(num_blocks):
+#             block = FusionBlock(embed_size, fu_mode)
+#             self.blocks.append(block)
+
+#     def forward(self, v, q, k):
+#         for block in self.blocks:
+#             v = block(v, q, k)
+#         return v
 
 
 

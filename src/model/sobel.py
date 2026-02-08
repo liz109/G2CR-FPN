@@ -1,94 +1,85 @@
-import numpy as np
 import torch
 import torch.nn as nn
-import cv2
-
-def get_gaussian_kernel(k=3, mu=0, sigma=1, normalize=True):
-    # compute 1 dimension gaussian
-    gaussian_1D = np.linspace(-1, 1, k)
-    # compute a grid distance from center
-    x, y = np.meshgrid(gaussian_1D, gaussian_1D)
-    distance = (x ** 2 + y ** 2) ** 0.5
-
-    # compute the 2 dimension gaussian
-    gaussian_2D = np.exp(-(distance - mu) ** 2 / (2 * sigma ** 2))
-    gaussian_2D = gaussian_2D / (2 * np.pi *sigma **2)
-
-    # normalize part (mathematically)
-    if normalize:
-        gaussian_2D = gaussian_2D / np.sum(gaussian_2D)
-    return gaussian_2D
+import torch.nn.functional as F
 
 
-def get_sobel_kernel(k=3):
-    # get range
-    range = np.linspace(-(k // 2), k // 2, k)
-    # compute a grid the numerator and the axis-distances
-    x, y = np.meshgrid(range, range)
-    sobel_2D_numerator = x
-    sobel_2D_denominator = (x ** 2 + y ** 2)
-    sobel_2D_denominator[:, k // 2] = 1  # avoid division by zero
-    sobel_2D = sobel_2D_numerator / sobel_2D_denominator
-    return sobel_2D
+class SobelConv2d(nn.Module):
 
+    def __init__(self, direction, in_channels, out_channels, kernel_size=3, stride=1,
+                 padding=1, dilation=1, groups=1, bias=True, requires_grad=True):
+        assert direction is not None, 'Must specifiy direction in x or y'
+        assert kernel_size % 2 == 1, 'SobelConv2d\'s kernel_size must be odd.'
+        assert out_channels % groups == 0, 'SobelConv2d\'s out_channels must be a multiple of groups.'
 
-class SobelFilter(nn.Module):
-    def __init__(self,
-                 k_gaussian=3,  # 5
-                 mu=0,
-                 sigma=1,
-                 k_sobel=3):
-        super(SobelFilter, self).__init__()
-        # gaussian
-        gaussian_2D = get_gaussian_kernel(k_gaussian, mu, sigma)    # [3, 3]
-        gaussian_filter = nn.Conv2d(in_channels=1,
-                                         out_channels=1,
-                                         kernel_size=k_gaussian,
-                                         padding=k_gaussian // 2,
-                                         bias=False)
-        gaussian_filter.weight.data = self._to_kernel(gaussian_2D)  # [1, 1, 3, 3]
+        super(SobelConv2d, self).__init__()
 
+        self.direction = direction
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.dilation = dilation
+        self.groups = groups
 
-        # sobel
-        sobel_2D = get_sobel_kernel(k_sobel)                    # [3, 3]
-        sobel_filter_x = nn.Conv2d(in_channels=1,
-                                        out_channels=1,
-                                        kernel_size=k_sobel,
-                                        padding=k_sobel // 2,
-                                        bias=False)
-        sobel_filter_x.weight.data = self._to_kernel(sobel_2D)
-        sobel_filter_y = nn.Conv2d(in_channels=1,
-                                        out_channels=1,
-                                        kernel_size=k_sobel,
-                                        padding=k_sobel // 2,
-                                        bias=False)
-        sobel_filter_y.weight.data = self._to_kernel(sobel_2D.T)
+        # In non-trainable case, it turns into normal Sobel operator with fixed weight and no bias.
+        self.bias = bias if requires_grad else False
 
-        self.gaussian_filter = gaussian_filter
-        self.sobel_filter_x = sobel_filter_x
-        self.sobel_filter_y = sobel_filter_y
-        
-    def _to_kernel(self, val):
-        # [h, w] -> [1, 1, h, w]
-        val = torch.from_numpy(val).to(torch.float)
-        return val.unsqueeze(0).unsqueeze(0) 
+        if self.bias:
+            self.bias = nn.Parameter(torch.zeros(size=(out_channels,), dtype=torch.float32), requires_grad=True)
+        else:
+            self.bias = None
 
-    def forward(self, img):
-        # set the setps tensors
-        B, C, H, W = img.shape
-        device = img.device
-        blurred = torch.zeros((B, C, H, W)).to(device)
-        grad_x = torch.zeros((B, C, H, W)).to(device)
-        grad_y = torch.zeros((B, C, H, W)).to(device)
+        # Initialize the Sobel kernal
+        self.sobel_weight = nn.Parameter(torch.zeros(
+            size=(out_channels, int(in_channels / groups), kernel_size, kernel_size)), requires_grad=False)
 
-        # gaussian
+        kernel_mid = kernel_size // 2
+        if self.direction == 'x':   # horizontal derivative approx. (x)
+            self.sobel_weight[:, :, :, 0] = -1
+            self.sobel_weight[:, :, kernel_mid, 0] = -2
+            self.sobel_weight[:, :, :, -1] = 1
+            self.sobel_weight[:, :, kernel_mid, -1] = 2
+        elif self.direction == 'y': # vertical derivative aprox. (y)
+            self.sobel_weight[:, :, 0, :] = -1
+            self.sobel_weight[:, :, 0, kernel_mid] = -2
+            self.sobel_weight[:, :, -1, :] = 1
+            self.sobel_weight[:, :, -1, kernel_mid] = 2
+        else:
+            raise Exception("Unrecognized direction")
 
-        for c in range(C):
-            blurred[:, c:c+1] = self.gaussian_filter(img[:, c:c+1].clone())
-            grad_x[:, c:c+1] = self.sobel_filter_x(blurred[:, c:c+1].clone())
-            grad_y[:, c:c+1] = self.sobel_filter_y(blurred[:, c:c+1].clone())
-
-
-        return grad_x, grad_y
     
-    
+        # Define the trainable sobel factor
+        if requires_grad:
+            self.sobel_factor = nn.Parameter(torch.ones(size=(out_channels, 1, 1, 1), dtype=torch.float32),
+                                             requires_grad=True)
+        else:
+            self.sobel_factor = nn.Parameter(torch.ones(size=(out_channels, 1, 1, 1), dtype=torch.float32),
+                                             requires_grad=False)
+            
+    def forward(self, x):
+        # if torch.cuda.is_available():
+        #     self.sobel_factor = self.sobel_factor.cuda()
+        #     if isinstance(self.bias, nn.Parameter):
+        #         self.bias = self.bias.cuda()
+
+        sobel_weight = self.sobel_weight * self.sobel_factor
+        # if torch.cuda.is_available():
+        #     sobel_weight = sobel_weight.cuda()
+
+        out = F.conv2d(x, sobel_weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
+        # weights = torch.randn(8, 4, 3, 3)   # (out_channel, in_channel/groups, kH, kW)
+        # inputs = torch.randn(1, 4, 5, 5)    # (batch, in_channel, iH, iW)
+        # print(F.conv2d(inputs, weights, padding=1).shape)   # (batch, out_channel, H, W)
+        return out
+
+# if __name__ == '__main__':
+#         img = torch.randn(16, 512, 32, 32)      # [N, C, H, W]
+#         B, C, H, W = img.shape
+#         in_ch = sobel_ch = C                      # in_channels = out_channels
+#         direction = 'x'
+#         conv_sobel = SobelConv2d(direction, in_ch, sobel_ch, kernel_size=3, stride=1, padding=1, bias=True)
+#         out_0 = conv_sobel(img)                 # [N, C, H, W]
+#         print(out_0.shape)
+
+   
